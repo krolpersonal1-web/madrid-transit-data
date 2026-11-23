@@ -1,0 +1,30 @@
+name: Rozkład Renfe
+# Renfe przebudowuje rozkład Cercanías codziennie nad ranem. Budujemy kilka razy na dobę i publikujemy jeden plik
+# (gałąź „data”, zawsze jeden commit — repozytorium nie rośnie).
+on:
+  schedule:
+    - cron: '25 3,4,5,7,11,17 * * *'   # UTC (w Madrycie +1 h zimą, +2 h latem)
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Zbuduj rozkład
+        run: |
+          mkdir -p out
+          ML_CACHE=cache node build.mjs --fresh --only-timetable --out=out
+      - name: Opublikuj na gałęzi data
+        run: |
+          cd out
+          git init -q -b data
+          git config user.name "rozklad-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add timetable.json
+          git commit -q -m "Rozkład $(date -u '+%F %H:%M') UTC"
+          git push -q -f "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.git" data
